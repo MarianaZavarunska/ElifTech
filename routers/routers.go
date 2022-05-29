@@ -37,7 +37,7 @@ func SetupRouter() *gin.Engine {
 
   v2 := router.Group("api/auth")
   {
-	  v2.POST("/register", controllers.Register)
+	  v2.POST("/register",middlewares.ValidatorMiddleware(), controllers.Register)
 	  v2.POST("/login", controllers.Login)
 	  v2.POST("/logout", middlewares.AuthMiddleware("access"), controllers.Logout)
 	  v2.POST("/refresh",middlewares.AuthMiddleware("refresh"), controllers.Refresh)
@@ -46,7 +46,7 @@ func SetupRouter() *gin.Engine {
     v3 :=router.Group("/users")  
 
     {
-	  v3.GET("",middlewares.AuthMiddleware("access"), controllers.GetAllUsers)
+	  v3.GET("", middlewares.AuthMiddleware("access"), controllers.GetAllUsers)
 	
     }
 
