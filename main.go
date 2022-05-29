@@ -50,6 +50,7 @@ func configDB () {
 	config.DB.AutoMigrate(&models.SentMessage{})
 	config.DB.AutoMigrate(&models.ReceiveMessage{})
 	config.DB.AutoMigrate(&models.User{})
+	config.DB.AutoMigrate(&models.BlackList{})
 }
 
 func setupRouter () {

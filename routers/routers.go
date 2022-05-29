@@ -4,11 +4,13 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"first-messanger/controllers"
+	"first-messanger/middlewares"
 )
 
 
 func SetupRouter() *gin.Engine {
   router := gin.Default()
+
 
   // router.Use(cors.New(cors.Config{
   //   AllowOrigins:     []string{"https://gorm.io"},
@@ -37,9 +39,16 @@ func SetupRouter() *gin.Engine {
   {
 	  v2.POST("/register", controllers.Register)
 	  v2.POST("/login", controllers.Login)
-	  v2.POST("/logout", controllers.Logout)
-	  v2.POST("/refresh", controllers.Refresh)
+	  v2.POST("/logout", middlewares.AuthMiddleware("access"), controllers.Logout)
+	  v2.POST("/refresh",middlewares.AuthMiddleware("refresh"), controllers.Refresh)
   }
+
+    v3 :=router.Group("/users")  
+
+    {
+	  v3.GET("",middlewares.AuthMiddleware("access"), controllers.GetAllUsers)
+	
+    }
 
   return router
 }

@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -41,9 +44,9 @@ func CreateUser (context *gin.Context, user models.User) (models.User, models.To
 
 	tokens, err := GenerateTokensPair(user.ID, user.Email)
 
-	 // 5. Set Cookies
-	 SetCookie(context, "accessToken", tokens.AccessToken, 900)
-	 SetCookie(context, "refreshToken", tokens.RefreshToken, 64000)
+	// 5. Set tokens into authorization headers
+	context.Header("Authorization", tokens.AccessToken)
+	context.Header("Authorization_Refresh", tokens.RefreshToken)
 
 	return user, *tokens, err
 
@@ -68,13 +71,9 @@ func LoginUser (context *gin.Context, user models.User) (models.User, models.Tok
 	// 3. generate Tokens
 	tokens, _:= GenerateTokensPair(user.ID, user.Email)
 
-    // 4. set Cookies
-
-	// t := time.Duration(15 * time.Minute)
-	// t  :=time.Now().Add(time.Minute * 15).Unix()
-	// int(12 * time.Hour)
-	SetCookie(context, "accessToken", tokens.AccessToken, 900)
-	SetCookie(context, "refreshToken", tokens.RefreshToken, 64000)
+	// 4. Set tokens into authorization headers
+	context.Request.Header.Add("Authorization", tokens.AccessToken)
+	context.Request.Header.Add("Authorization_Refresh", tokens.RefreshToken)
 
 	// 5. return response
 
@@ -82,32 +81,45 @@ func LoginUser (context *gin.Context, user models.User) (models.User, models.Tok
 }
 
 func LogoutUser(context *gin.Context){
-	SetCookie(context, "accessToken", "", -1);
+
+		// 1. Get accessToken from authorization headers
+		accessToken := context.GetHeader("Authorization");
+		
+		if accessToken == "" {
+			context.JSON(http.StatusUnauthorized, gin.H{"status": http.StatusUnauthorized, "message": "Authorization Token is required"})
+			context.Abort()
+			return
+		}
 }
 
 //FE: check if access token exists and if it's valid. If yes, return, not - redirect refresh token 
 
-func RefreshUserToken(context *gin.Context) (models.User, models.Tokens, error) {
+func RefreshUserToken(context *gin.Context, tokenString string) (models.User, models.Tokens, error) {
+	
 
-	 //1. Check if refresh token valid.
-	val, err :=context.Cookie("refreshToken")
-
+	// 1. Convert tokenString to JWT 
+ 
+	err := godotenv.Load()
 	if err != nil {
-		fmt.Println("the error: ", err , http.StatusUnauthorized, "Refresh token expired")
-		return models.User{}, models.Tokens{}, err
-	} 
+	  fmt.Println("Error loading .env file")
+	}
+  
+	VERIFICATION_KEY := os.Getenv("SECRET_REFRESH_KEY")
 
-	refreshToken, err := VerifyToken(val)
+    claims := jwt.MapClaims{}
 
-	if err != nil {
-		fmt.Println("the error: ", err)
-		context.JSON(http.StatusUnauthorized, "Refresh isn't valid")
+    token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+    return []byte(VERIFICATION_KEY), nil
+    })
+
+    if err != nil {
+
 		return models.User{}, models.Tokens{}, err
 	}
 
 	// 2. Since token is valid, get the email:
 
-	userEmail, userId, err := GetUserDataFromToken(refreshToken)
+	userEmail, userId, err := GetUserDataFromToken(token)
 
 	if err != nil {
 		fmt.Println("the error: ", err)
@@ -120,13 +132,10 @@ func RefreshUserToken(context *gin.Context) (models.User, models.Tokens, error) 
 	 if err !=nil {
 		fmt.Println("the error: ", err)
 		return models.User{}, models.Tokens{}, err
-	 }
+	}
 
-
-    // 4.  set Cookies
-
-	SetCookie(context, "accessToken", tokens.AccessToken, 900)
-	SetCookie(context, "refreshToken", tokens.RefreshToken, 64000)
+	// 4. Set tokens into authorization headers
+	 context.Header("Authorization", tokens.AccessToken)
 
 	var user = models.User{
 		Email: userEmail,
@@ -169,12 +178,6 @@ func GetUserIfExist(userEmail string) (models.User, error){
 
 
 func GeneratehashPassword(password string) (string, error) {
-
-	// err := godotenv.Load()
-    // if err != nil {
-    // fmt.Println("Error loading .env file")
-    // }
-    // salt := os.Getenv("HASH_SALT")
 
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 10)
 	return string(bytes), err

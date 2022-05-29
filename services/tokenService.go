@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"first-messanger/models"
+	"first-messanger/repositories"
 	"fmt"
 	"os"
 	"strconv"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 
-	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
 
@@ -32,7 +32,7 @@ func GenerateTokensPair(userId uint, userEmail string) (*models.Tokens, error) {
 	atClaims["user_email"] = userEmail
 	atClaims["exp"] = td.AtExpires
 	at := jwt.NewWithClaims(jwt.SigningMethodHS256, atClaims)
-	td.AccessToken, err = at.SignedString([]byte(os.Getenv("ACCESS_SECRET")))
+	td.AccessToken, err = at.SignedString([]byte(os.Getenv("SECRET_ACCESS_KEY")))
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func GenerateTokensPair(userId uint, userEmail string) (*models.Tokens, error) {
 	rtClaims["user_id"] = userId
 	rtClaims["exp"] = td.RtExpires
 	rt := jwt.NewWithClaims(jwt.SigningMethodHS256, rtClaims)
-	td.RefreshToken, err = rt.SignedString([]byte(os.Getenv("REFRESH_SECRET")))
+	td.RefreshToken, err = rt.SignedString([]byte(os.Getenv("SECRET_REFRESH_KEY")))
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func VerifyToken(tokenFromCookie string) (*jwt.Token, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte(os.Getenv("REFRESH_TOKEN")), nil
+		return []byte(os.Getenv("SECRET_REFRESH_KEY")), nil
 	})
 	if err != nil {
 		return nil, err
@@ -80,15 +80,20 @@ func GetUserDataFromToken(refreshToken *jwt.Token ) (string, uint, error) {
 	}
 }
 
-func SetCookie(context *gin.Context, name string, value string, age int){
-	context.SetCookie(
-        name,
-		value,
-		age,
-		"/api/auth",
-		"localhost:8080",
-		false,
-		false,
-    )
+func GetTokenFromBlacklist(tokenType string, token string) bool {
+   
+	isTokenExist, _ := repositories.FindTokenInBlacklist(tokenType,token)
 
+	return isTokenExist
+   
+}
+
+func SetTokenToBlacklist(blacklistItem *models.BlackList) ( error){
+    err := repositories.SetTokenToBlacklist(blacklistItem)
+
+	if err != nil {
+		return  err
+	}
+	
+	return  nil
 }
